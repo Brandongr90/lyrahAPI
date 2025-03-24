@@ -157,13 +157,11 @@ const SurveyController = {
           );
       }
 
-      return res
-        .status(200)
-        .json(
-          formatResponse(true, "Última encuesta obtenida exitosamente", {
-            survey,
-          })
-        );
+      return res.status(200).json(
+        formatResponse(true, "Última encuesta obtenida exitosamente", {
+          survey,
+        })
+      );
     } catch (error) {
       console.error(
         `Error al obtener última encuesta para perfil ${req.params.profileId}:`,
@@ -230,13 +228,11 @@ const SurveyController = {
         ip_address: req.ip,
       });
 
-      return res
-        .status(201)
-        .json(
-          formatResponse(true, "Encuesta creada exitosamente", {
-            survey: newSurvey,
-          })
-        );
+      return res.status(201).json(
+        formatResponse(true, "Encuesta creada exitosamente", {
+          survey: newSurvey,
+        })
+      );
     } catch (error) {
       console.error("Error al crear encuesta:", error);
       return handleDatabaseError(error, res);
@@ -291,13 +287,11 @@ const SurveyController = {
         ip_address: req.ip,
       });
 
-      return res
-        .status(200)
-        .json(
-          formatResponse(true, "Encuesta actualizada exitosamente", {
-            survey: updatedSurvey,
-          })
-        );
+      return res.status(200).json(
+        formatResponse(true, "Encuesta actualizada exitosamente", {
+          survey: updatedSurvey,
+        })
+      );
     } catch (error) {
       console.error(
         `Error al actualizar encuesta con ID ${req.params.id}:`,
@@ -370,13 +364,11 @@ const SurveyController = {
 
       const metrics = await SurveyModel.getWellnessMetrics();
 
-      return res
-        .status(200)
-        .json(
-          formatResponse(true, "Métricas de bienestar obtenidas exitosamente", {
-            metrics,
-          })
-        );
+      return res.status(200).json(
+        formatResponse(true, "Métricas de bienestar obtenidas exitosamente", {
+          metrics,
+        })
+      );
     } catch (error) {
       console.error("Error al obtener métricas de bienestar:", error);
       return handleDatabaseError(error, res);
@@ -514,16 +506,64 @@ const SurveyController = {
 
       const progress = await MetricsModel.getWellnessProgress(profileId);
 
-      return res
-        .status(200)
-        .json(
-          formatResponse(true, "Progreso de bienestar obtenido exitosamente", {
-            progress,
-          })
-        );
+      return res.status(200).json(
+        formatResponse(true, "Progreso de bienestar obtenido exitosamente", {
+          progress,
+        })
+      );
     } catch (error) {
       console.error(
         `Error al obtener progreso de bienestar para perfil ${req.params.profileId}:`,
+        error
+      );
+      return handleDatabaseError(error, res);
+    }
+  },
+
+  /**
+   * Recalcular puntajes de una encuesta
+   */
+  recalculateSurveyScores: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Verificar si la encuesta existe
+      const existingSurvey = await SurveyModel.getSurveyById(id);
+      if (!existingSurvey) {
+        return res
+          .status(404)
+          .json(formatResponse(false, "Encuesta no encontrada"));
+      }
+
+      // Verificar permisos
+      const profile = await ProfileModel.getProfileById(
+        existingSurvey.profile_id
+      );
+      if (req.user.userId !== profile.user_id && req.user.role !== "admin") {
+        return res
+          .status(403)
+          .json(
+            formatResponse(
+              false,
+              "No tienes permisos para actualizar esta encuesta"
+            )
+          );
+      }
+
+      // Recalcular los puntajes
+      await db.query("SELECT recalculate_survey_scores($1)", [id]);
+
+      // Obtener la encuesta actualizada
+      const updatedSurvey = await SurveyModel.getSurveyById(id);
+
+      return res.status(200).json(
+        formatResponse(true, "Puntajes recalculados exitosamente", {
+          survey: updatedSurvey,
+        })
+      );
+    } catch (error) {
+      console.error(
+        `Error al recalcular puntajes para encuesta ${req.params.id}:`,
         error
       );
       return handleDatabaseError(error, res);

@@ -1,6 +1,8 @@
 const db = require("../config/db");
 const { v4: uuidv4 } = require("uuid");
 
+const SurveyModel = require("../models/surveys.model");
+
 const SurveyModel = {
   /**
    * Obtener todas las encuestas
@@ -235,10 +237,16 @@ const SurveyModel = {
         }
       }
 
+      // Esperar un poco para asegurar que los triggers se hayan ejecutado
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Si quieres estar 100% seguro, puedes recalcular explícitamente los puntajes
+      await client.query("SELECT recalculate_survey_scores($1)", [survey_id]);
+
       await client.query("COMMIT");
 
       // Obtener la encuesta completa con puntajes calculados
-      const completeSurvey = await this.getSurveyById(survey_id);
+      const completeSurvey = await SurveyModel.getSurveyById(survey_id);
 
       return completeSurvey;
     } catch (error) {
@@ -277,6 +285,13 @@ const SurveyModel = {
 
       // Actualizar las respuestas
       if (responses.length > 0) {
+        // Primero eliminar respuestas existentes
+        await client.query(
+          "DELETE FROM survey_responses WHERE survey_id = $1",
+          [surveyId]
+        );
+
+        // Luego insertar las nuevas respuestas
         for (const response of responses) {
           const { question_id, selected_option_id, score } = response;
 
@@ -287,10 +302,6 @@ const SurveyModel = {
               selected_option_id,
               score
             ) VALUES ($1, $2, $3, $4)
-            ON CONFLICT (survey_id, question_id) 
-            DO UPDATE SET
-              selected_option_id = $3,
-              score = $4
             RETURNING *
           `;
 
@@ -303,12 +314,13 @@ const SurveyModel = {
         }
       }
 
+      // Recalcular puntajes
+      await client.query("SELECT recalculate_survey_scores($1)", [surveyId]);
+
       await client.query("COMMIT");
 
-      // Recalcular los puntajes por categoría (este cálculo depende de tus triggers)
-
       // Obtener la encuesta completa con puntajes actualizados
-      const updatedSurvey = await this.getSurveyById(surveyId);
+      const updatedSurvey = await SurveyModel.getSurveyById(surveyId);
 
       return updatedSurvey;
     } catch (error) {

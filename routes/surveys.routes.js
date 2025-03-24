@@ -29,5 +29,7 @@ router.get('/options/wellness-activities', SurveyController.getWellnessActivitie
 // Rutas para métricas y estadísticas
 router.get('/metrics/wellness', authorize('admin'), SurveyController.getWellnessMetrics);
 router.get('/statistics/summary', authorize('admin'), SurveyController.getSurveyStatistics);
+// Añadir esta nueva ruta:
+router.post('/:id/recalculate', validateUUID, SurveyController.recalculateSurveyScores);
 
 module.exports = router;
