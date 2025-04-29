@@ -2,7 +2,11 @@
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
+const db = require("./config/db");
 require("dotenv").config();
+
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 // Importaciones de Rutas
 const userRoutes = require("./routes/users.routes");
@@ -23,9 +27,24 @@ const PORT = process.env.PORT || 3000;
 
 // Middlewares
 app.use(cors());
-app.use(morgan("dev"));
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Middleware para verificar estado de la DB en cada petición
+app.use(async (req, res, next) => {
+  // Verificar DB solo para rutas que no sean de salud
+  if (!req.path.includes('/health') && !req.path.includes('/status')) {
+    const isDbConnected = await db.ping().catch(() => false);
+    if (!isDbConnected) {
+      return res.status(503).json({
+        success: false,
+        message: "Servicio no disponible: Problema de conexión con la base de datos"
+      });
+    }
+  }
+  next();
+});
 
 // Rutas
 app.use("/api/users", userRoutes);
@@ -46,6 +65,24 @@ app.get("/", (req, res) => {
   });
 });
 
+// Endpoint de estado para monitorización
+app.get("/health", async (req, res) => {
+  try {
+    const dbStatus = await db.ping();
+    res.json({
+      status: "ok",
+      db: dbStatus ? "connected" : "disconnected",
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Middleware para las rutas no encontradas
 app.use((req, res, next) => {
   const error = new Error(`Ruta no encontrada - ${req.originalUrl}`);
@@ -57,6 +94,40 @@ app.use((req, res, next) => {
 app.use(errorMiddleware);
 
 // Iniciar Servidor
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server Running http://localhost:${PORT}`);
+});
+
+// Manejo de señales de terminación
+const handleShutdown = async () => {
+  console.log('Cerrando servidor...');
+  server.close(async () => {
+    console.log('Servidor HTTP cerrado.');
+    // Cerrar conexiones a la base de datos
+    await db.close();
+    process.exit(0);
+  });
+
+  // Si no se cierra en 10 segundos, forzar salida
+  setTimeout(() => {
+    console.error('Forzando cierre después de 10s');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', handleShutdown);
+process.on('SIGINT', handleShutdown);
+
+// Manejar rechazos de promesas no capturados
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Rechazo de promesa no manejado:', reason);
+  // No cerramos la aplicación, solo registramos el error
+});
+
+// Manejar excepciones no capturadas
+process.on('uncaughtException', (error) => {
+  console.error('Excepción no capturada:', error);
+  // En producción, generalmente queremos cerrar la aplicación
+  // pero de forma ordenada
+  handleShutdown();
 });
