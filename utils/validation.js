@@ -122,6 +122,11 @@ const validateUUID = [
   validateRequest,
 ];
 
+const validateUserIdUUID = [
+  param("userId").isUUID().withMessage("El ID del usuario debe ser un UUID válido"),
+  validateRequest,
+];
+
 module.exports = {
   validateRequest,
   registerValidation,
@@ -129,4 +134,5 @@ module.exports = {
   profileValidation,
   surveyValidation,
   validateUUID,
+  validateUserIdUUID
 };

@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const ProfileController = require("../controllers/profiles.controller");
 const { protect, authorize } = require("../middlewares/auth.middleware");
-const { profileValidation, validateRequest, validateUUID } = require("../utils/validation");
+const { profileValidation, validateRequest, validateUUID, validateUserIdUUID } = require("../utils/validation");
 
 // Todas las rutas de perfiles requieren autenticación
 router.use(protect);
@@ -10,7 +10,7 @@ router.use(protect);
 // Rutas principales
 router.get("/", authorize('admin'), ProfileController.getAllProfiles);
 router.get("/:id", validateUUID, ProfileController.getProfileById);
-router.get("/user/:userId", validateUUID, ProfileController.getProfileByUserId);
+router.get("/user/:userId", validateUserIdUUID, ProfileController.getProfileByUserId);
 router.post("/", profileValidation, validateRequest, ProfileController.createProfile);
 router.put("/:id", validateUUID, profileValidation, validateRequest, ProfileController.updateProfile);
 
