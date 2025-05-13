@@ -6,6 +6,7 @@ const db = require("./config/db");
 require("dotenv").config();
 
 const helmet = require('helmet');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
 // Importaciones de Rutas
@@ -26,7 +27,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middlewares
-app.use(cors());
+/* app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || 'https://tudominio.com',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  credentials: true
+})); */
+app.use(cors({
+  origin: '*',  // Permite todas las conexiones durante desarrollo
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  credentials: true
+}));
+app.use(compression());
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -46,7 +57,14 @@ app.use(async (req, res, next) => {
   next();
 });
 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // limita cada IP a 100 solicitudes por windowMs
+  message: 'Demasiadas solicitudes desde esta IP, por favor intenta más tarde'
+});
+
 // Rutas
+app.use(limiter)
 app.use("/api/users", userRoutes);
 app.use("/api/profiles", profileRoutes);
 app.use("/api/surveys", surveyRoutes);
