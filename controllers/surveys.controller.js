@@ -551,7 +551,7 @@ const SurveyController = {
       }
 
       // Recalcular los puntajes
-      await db.query("SELECT recalculate_survey_scores($1)", [id]);
+      await db.query("SELECT calculate_survey_scores($1)", [id]);
 
       // Obtener la encuesta actualizada
       const updatedSurvey = await SurveyModel.getSurveyById(id);
